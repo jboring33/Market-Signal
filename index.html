@@ -346,6 +346,48 @@
     <span id="refresh-icon">↻</span> Refresh Signal
   </button>
 
+  <!-- ERROR BOX -->
+  <div id="error-box" style="display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:1rem 1.4rem; margin-bottom:1.5rem; font-size:0.8rem; color:#ef4444; line-height:1.6;">
+    <strong>⚠ API Error:</strong> <span id="error-msg"></span><br>
+    <span style="color:var(--muted)">Use the manual entry below to calculate your signal without the API.</span>
+  </div>
+
+  <!-- MANUAL ENTRY PANEL -->
+  <div id="manual-panel" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.4rem 1.6rem; margin-bottom:1.5rem;">
+    <div style="font-size:0.7rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:1rem;">✏ Manual Data Entry — Look These Up Yourself</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1rem;">
+      <div>
+        <label style="display:block;font-size:0.68rem;color:var(--muted);margin-bottom:0.3rem;">SPY Current Price ($)<br><span style="font-size:0.62rem">→ finance.yahoo.com/quote/SPY</span></label>
+        <input type="number" id="m-spy" placeholder="e.g. 510.00" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.85rem;padding:0.45rem 0.75rem;outline:none;">
+      </div>
+      <div>
+        <label style="display:block;font-size:0.68rem;color:var(--muted);margin-bottom:0.3rem;">SPY 50-Day SMA ($)<br><span style="font-size:0.62rem">→ stockanalysis.com/etf/spy/</span></label>
+        <input type="number" id="m-sma" placeholder="e.g. 530.00" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.85rem;padding:0.45rem 0.75rem;outline:none;">
+      </div>
+      <div>
+        <label style="display:block;font-size:0.68rem;color:var(--muted);margin-bottom:0.3rem;">VIX Current Level<br><span style="font-size:0.62rem">→ finance.yahoo.com/quote/%5EVIX</span></label>
+        <input type="number" id="m-vix" placeholder="e.g. 22.5" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.85rem;padding:0.45rem 0.75rem;outline:none;">
+      </div>
+      <div>
+        <label style="display:block;font-size:0.68rem;color:var(--muted);margin-bottom:0.3rem;">Trend (based on chart)<br><span style="font-size:0.62rem">→ Is SPY moving up, down, sideways?</span></label>
+        <select id="m-trend" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.82rem;padding:0.45rem 0.75rem;outline:none;">
+          <option value="uptrend">↑ Uptrend</option>
+          <option value="sideways" selected>→ Sideways</option>
+          <option value="downtrend">↓ Downtrend</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.68rem;color:var(--muted);margin-bottom:0.3rem;">Sentiment<br><span style="font-size:0.62rem">→ aaii.com/sentimentsurvey</span></label>
+        <select id="m-sentiment" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.82rem;padding:0.45rem 0.75rem;outline:none;">
+          <option value="bullish">😊 Bullish</option>
+          <option value="neutral" selected>😐 Neutral</option>
+          <option value="bearish">😟 Bearish</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-refresh" style="margin-bottom:0" onclick="runManual()">⚡ Calculate Signal from My Data</button>
+  </div>
+
   <!-- INDICATORS -->
   <div class="indicators" id="indicators-grid">
     <div class="ind-card"><div class="ind-header"><span class="ind-name">SPY vs 50-day SMA</span></div><div class="ind-value" style="color:var(--muted)">—</div><div class="ind-detail">Loading…</div></div>
