@@ -432,8 +432,8 @@
     </div>
     <div class="ch-field">
       <label>Channel Width — Upper Premium (%)</label>
-      <input type="number" id="ch-width" step="0.5" value="38">
-      <div class="ch-hint">% above lower line where upper channel sits (default 38%)</div>
+      <input type="number" id="ch-width" step="0.5" value="58">
+      <div class="ch-hint">% above lower line where upper sits (SPY since 2020 ≈ 55–60%)</div>
     </div>
     <div class="ch-field">
       <label>Projection Months Ahead</label>
@@ -464,7 +464,8 @@
 
     <!-- PROBABILITY CARD -->
     <div class="prob-card">
-      <div class="prob-title">Channel Position &amp; Directional Probability</div>
+      <div class="prob-title">Channel Position &amp; 90-Day Directional Probability</div>
+      <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:.7rem;line-height:1.5">Based on historical SPY behavior after spending time at this channel position since 2020. "Up" = index higher in 90 days. Bars show relative likelihood, not certainty.</div>
 
       <div class="pos-meter-wrap">
         <!-- Vertical position bar -->
@@ -554,6 +555,10 @@ let prevData     = null;
 let lastSignal   = null;   // 'green'|'yellow'|'red' from Tab 1
 let lastDCALabel = '—';
 let channelChart = null;
+window._channelPos   = undefined;
+window._channelZone  = undefined;
+window._channelColor = undefined;
+window._channelUp    = undefined;
 
 const KEYS = {
   index:'ms_index', price:'ms_price', sma:'ms_sma', vix:'ms_vix',
@@ -729,7 +734,9 @@ function render(price,sma,vix,trend,aaii,S){
   const smaScore  =smaPct>=0?0:smaPct>=-15?1:2;
   const vixScore  =vix<S.vixC?0:vix<S.vixS?1:2;
   const trendScore=trend==='uptrend'?0:trend==='sideways'?1:2;
-  const aaiiScore =aaii>=55?2:aaii>=45?1:0;
+  // AAII: avg bullish is ~38%. <25=extreme fear(contrarian buy=green), 25-35=bearish(red),
+  // 35-45=neutral(yellow), 45-55=optimistic(green), >55=euphoric(contrarian sell=red)
+  const aaiiScore = aaii < 25 ? 0 : aaii < 35 ? 2 : aaii < 45 ? 1 : aaii < 55 ? 0 : 2;
   const total=smaScore+vixScore+trendScore+aaiiScore;
   const signal=total<=2?'green':total<=5?'yellow':'red';
   const dcaAmt=signal==='green'?S.budget:signal==='yellow'?Math.round(S.budget*.5):0;
@@ -775,7 +782,8 @@ function render(price,sma,vix,trend,aaii,S){
   setInd('sma',smaCls,(smaPct>=0?'+':'')+smaPct.toFixed(2)+'%',Math.min(100,Math.max(5,50+smaPct*2)),`${ticker} $${price.toFixed(2)} · SMA $${sma.toFixed(2)}`);
   setInd('vix',vixCls,vix.toFixed(1),Math.min(100,(vix/60)*100),`<${S.vixC} calm · ${S.vixC}–${S.vixS} caution · >${S.vixS} stop`);
   setInd('trend',trendCls,trend==='uptrend'?'↑ Up':trend==='sideways'?'→ Flat':'↓ Down',trendScore===0?78:trendScore===1?50:22,undefined);
-  setInd('sent',sentCls,aaii.toFixed(1)+'%',Math.min(100,(aaii/100)*100),aaii<=25?'Extreme fear (contrarian buy)':aaii>=55?'Euphoria (caution)':'Normal range');
+  const aaiiLabel=aaii<25?'Extreme fear → contrarian BUY':aaii<35?'Bearish → caution ('+aaii.toFixed(0)+'%)':aaii<45?'Neutral range ('+aaii.toFixed(0)+'%)':aaii<55?'Optimistic → favorable':'Euphoric → contrarian SELL';
+  setInd('sent',sentCls,aaii.toFixed(1)+'%',Math.min(100,(aaii/100)*100),aaiiLabel);
 
   // Save previous
   const nowData={price,sma,smaPct,vix,trend,aaii,signal,date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})};
@@ -999,9 +1007,10 @@ function buildChannel(){
     document.getElementById('pp-flat').classList.remove(c);
     document.getElementById('pp-dn').classList.remove(c);
   });
-  document.getElementById('pp-up').classList.add(zoneColor==='green'?'green':'yellow');
+  // Color the probability gauges: up=green when favorable, down=red when risky
+  document.getElementById('pp-up').classList.add(upPct>=dnPct?'green':'yellow');
   document.getElementById('pp-flat').classList.add('yellow');
-  document.getElementById('pp-dn').classList.add(zoneColor==='red'?'red':'yellow');
+  document.getElementById('pp-dn').classList.add(dnPct>upPct?'red':'yellow');
   document.getElementById('prob-verdict').textContent = verdict;
 
   // ── KEY LEVELS TABLE ──
@@ -1044,58 +1053,50 @@ function buildChannel(){
 
 function updateCombined(){
   const dEl=document.getElementById('comb-dca');
+  if(!dEl) return;
   const cEl=document.getElementById('comb-ch');
   const vEl=document.getElementById('comb-verdict');
   const dsEl=document.getElementById('comb-dca-sub');
   const csEl=document.getElementById('comb-ch-sub');
   const vsEl=document.getElementById('comb-verdict-sub');
+  if(!cEl||!vEl||!dsEl||!csEl||!vsEl) return;
 
-  // DCA signal
   if(lastSignal){
-    ['green','yellow','red','muted'].forEach(c=>{dEl.classList.remove(c);});
+    ['green','yellow','red','muted'].forEach(c=>dEl.classList.remove(c));
     dEl.classList.add(lastSignal);
     dEl.textContent=lastDCALabel;
     dsEl.textContent=lastSignal==='green'?'All 4 indicators favorable':lastSignal==='yellow'?'Mixed signals — partial DCA':'Poor conditions — preserve cash';
   }
 
-  // Channel
-  if(window._channelColor!==undefined){
-    ['green','yellow','red','muted'].forEach(c=>{cEl.classList.remove(c);});
+  const hasChannel=window._channelColor!==undefined && window._channelZone!==undefined;
+  if(hasChannel){
+    ['green','yellow','red','muted'].forEach(c=>cEl.classList.remove(c));
     cEl.classList.add(window._channelColor);
     cEl.textContent=window._channelZone;
-    csEl.textContent=`${window._channelUp}% probability of up move`;
+    csEl.textContent=window._channelUp+'% prob. of up move';
   }
 
-  // Combined
-  if(lastSignal && window._channelColor!==undefined){
-    const bothGreen  = lastSignal==='green'  && window._channelColor==='green';
-    const bothRed    = lastSignal==='red'    && window._channelColor==='red';
-    const contradicts= (lastSignal==='green' && window._channelColor==='red') ||
-                       (lastSignal==='red'   && window._channelColor==='green');
+  if(!lastSignal||!hasChannel) return;
 
-    let verdict, vColor, vsub;
-    if(bothGreen){
-      verdict='Strong Buy'; vColor='green';
-      vsub='Both DCA signal AND channel position favor upside. Highest-conviction DCA opportunity.';
-    } else if(bothRed){
-      verdict='Strong Hold'; vColor='red';
-      vsub='Both signals unfavorable. Preserve cash, wait for DCA signal to improve or price to drop in channel.';
-    } else if(contradicts && lastSignal==='green'){
-      verdict='Cautious DCA'; vColor='yellow';
-      vsub='DCA signal is green but price is high in channel. Deploy only 50% — channel position adds risk.';
-    } else if(contradicts && lastSignal==='red'){
-      verdict='Watch Closely'; vColor='yellow';
-      vsub='Channel says oversold but DCA signal is red. Don\'t force entries — wait for signal to confirm.';
-    } else {
-      verdict='Neutral'; vColor='yellow';
-      vsub='Mixed signals. Stick to your regular DCA cadence without increasing size.';
-    }
+  const bothGreen=lastSignal==='green'&&window._channelColor==='green';
+  const bothRed=lastSignal==='red'&&window._channelColor==='red';
+  const dcaGchR=lastSignal==='green'&&window._channelColor==='red';
+  const dcaRchG=lastSignal==='red'&&window._channelColor==='green';
+  const dcaY=lastSignal==='yellow';
 
-    ['green','yellow','red','muted'].forEach(c=>{vEl.classList.remove(c);});
-    vEl.classList.add(vColor);
-    vEl.textContent=verdict;
-    vsEl.textContent=vsub;
-  }
+  let verdict,vColor,vsub;
+  if(bothGreen){verdict='Strong Buy';vColor='green';vsub='Both DCA signal AND channel position favor upside. Highest-conviction entry — deploy full budget.';}
+  else if(bothRed){verdict='Hold Cash';vColor='red';vsub='Both signals unfavorable. Price is high in channel AND short-term conditions are poor. Preserve cash.';}
+  else if(dcaGchR){verdict='Cautious DCA';vColor='yellow';vsub='Short-term signal is green but price is near top of long-term channel. Deploy only 50% — channel adds meaningful risk.';}
+  else if(dcaRchG){verdict='Wait for Confirm';vColor='yellow';vsub='Price is low in channel (good long-term value) but short-term signal is red. Wait for VIX to calm before buying.';}
+  else if(dcaY&&window._channelColor==='green'){verdict='Steady DCA';vColor='yellow';vsub='Channel position is favorable for long-term entry. Short-term is mixed. Deploy regular cadence — do not increase size yet.';}
+  else if(dcaY&&window._channelColor==='red'){verdict='Reduce DCA';vColor='red';vsub='Mixed short-term AND price is high in channel. Deploy 25% of budget max — wait for better channel position.';}
+  else{verdict='Neutral';vColor='yellow';vsub='Signals are mixed. Stick to your regular DCA cadence without changing size.';}
+
+  ['green','yellow','red','muted'].forEach(c=>vEl.classList.remove(c));
+  vEl.classList.add(vColor);
+  vEl.textContent=verdict;
+  vsEl.textContent=vsub;
 }
 
 // ═══════════════════════════════════════
